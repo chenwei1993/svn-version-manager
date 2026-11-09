@@ -1,0 +1,183 @@
+:root {
+  color-scheme: light;
+  --el-font-size-base: 13px;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #app {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+  font-size: 13px;
+  background: #f5f7fa;
+  color: #303133;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app { display: flex; height: 100%; }
+
+/* ---------- 侧栏 ---------- */
+.sidebar {
+  width: 220px;
+  flex: 0 0 220px;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-right: 1px solid #e4e7ed;
+  padding: 12px 10px;
+}
+
+.brand { display: flex; align-items: center; gap: 10px; padding: 6px 8px 18px; }
+.brand-logo {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  display: block;
+  object-fit: contain;
+  border-radius: 8px;
+}
+.brand h1 { font-size: 15px; font-weight: 600; color: #303133; margin: 0; }
+.brand p { font-size: 11px; color: #909399; margin: 1px 0 0; }
+
+.side-menu { border-right: 0 !important; background: transparent; }
+.side-menu .el-menu-item {
+  height: 38px;
+  line-height: 38px;
+  margin-bottom: 2px;
+  border-radius: 6px;
+  color: #606266;
+  font-size: 13.5px;
+}
+.side-menu .el-menu-item:hover { background: #f5f7fa; color: #303133; }
+.side-menu .el-menu-item.is-active {
+  background: #ecf5ff;
+  color: var(--el-color-primary);
+  font-weight: 600;
+}
+
+/* ---------- 主区域 ---------- */
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+.topbar {
+  flex: 0 0 56px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; padding: 0 20px;
+  background: #fff;
+  border-bottom: 1px solid #e4e7ed;
+  z-index: 5;
+}
+.project-picker { display: flex; align-items: center; gap: 8px; }
+.project-picker .picker-icon { color: #909399; display: flex; }
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+
+.content {
+  flex: 1;
+  overflow: auto;
+  padding: 20px 24px 28px;
+  background: #f5f7fa;
+}
+
+/* ---------- 页面 ---------- */
+.view { max-width: 1360px; margin: 0 auto; }
+.view-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.view-title h2 { font-size: 20px; font-weight: 600; color: #303133; margin: 0; line-height: 1.3; }
+.view-title p { margin: 4px 0 0; font-size: 12.5px; color: #909399; }
+.actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.panel { border-radius: 8px; }
+.table-panel .el-card__body { padding: 0; }
+.toolbar-card .el-card__body { padding: 12px 16px; }
+.toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.toolbar-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.cell-title { font-size: 13px; font-weight: 600; color: #303133; }
+.cell-sub { font-size: 11.5px; color: #909399; margin-top: 2px; }
+.mono { font-family: Consolas, "Cascadia Mono", monospace; font-size: 12px; }
+.muted { color: #909399; }
+.hint { font-size: 12px; color: #909399; }
+.num { text-align: center; font-variant-numeric: tabular-nums; }
+.clickable-table .el-table__body tr { cursor: pointer; }
+
+/* ---------- 功能详情 ---------- */
+.detail-page { max-width: 1200px; }
+.detail-topbar { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
+.detail-title { min-width: 0; }
+.detail-title h2 { font-size: 20px; font-weight: 600; margin: 0; line-height: 1.35; word-break: break-word; }
+.detail-sub { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px; font-size: 12px; color: #909399; }
+.detail-topbar .actions { margin-left: auto; }
+.detail-tabs .el-tabs__header { margin: 0; padding: 0 16px; }
+.detail-tabs .el-tabs__content { padding: 18px; }
+.detail-tabs .el-tabs__item { height: 44px; }
+.detail-card .el-card__body { padding: 0; }
+.tab-tag { margin-left: 6px; }
+
+.section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.section-head h4 { margin: 0; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.section-head .hint { margin-top: 4px; }
+
+/* ---------- 提交 / 选择条 ---------- */
+.selectbar {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  background: #fff !important;
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, .08);
+}
+.selectbar .count { font-size: 13px; color: #606266; }
+.selectbar .count strong { color: var(--el-color-primary); }
+.empty-assoc { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+/* ---------- 导出 ---------- */
+.export-actions { display: flex; align-items: center; gap: 10px; margin: 12px 0; }
+.export-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.export-bar .el-input { flex: 1; min-width: 260px; }
+.result-card { margin-top: 14px; background: #f0f9eb; border-color: #b3e19d; }
+.result-card .el-card__body { padding: 14px 16px; }
+.empty-wrap { padding: 10px 0; }
+
+/* ---------- 状态栏 ---------- */
+.statusbar {
+  flex: 0 0 30px;
+  display: flex; align-items: center; gap: 9px;
+  padding: 0 16px;
+  background: #fff;
+  border-top: 1px solid #e4e7ed;
+  font-size: 12px;
+  color: #909399;
+  cursor: pointer;
+  user-select: none;
+}
+.statusbar:hover { background: #fafafa; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: #e6a23c; flex: 0 0 8px; }
+.status-dot.ok { background: #67c23a; }
+.status-sep { width: 1px; height: 12px; background: #e4e7ed; }
+.status-path {
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: Consolas, monospace; font-size: 11.5px;
+}
+.status-meta { color: #c0c4cc; }
+
+/* ---------- 少量 Element Plus 微调 ---------- */
+.el-card { border-color: #e4e7ed; }
+.el-table th.el-table__cell { background: #fafafa; color: #606266; font-weight: 600; }
+.el-table .el-table__cell { padding: 7px 0; }
+.el-dialog { border-radius: 8px; }
+.el-dialog__header { margin-right: 0; }
+.el-empty { padding: 28px 0; }
+.el-form-item { margin-bottom: 16px; }
+.el-tabs__nav-wrap::after { height: 1px; background: #e4e7ed; }
+.el-descriptions__content { word-break: break-all; }

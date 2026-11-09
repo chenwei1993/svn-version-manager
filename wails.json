@@ -1,0 +1,20 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "project-manage",
+  "outputfilename": "SVN版本管理",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "Joe Chan",
+    "email": "363062285@qq.com"
+  },
+  "info": {
+    "companyName": "SVN版本管理",
+    "productName": "SVN版本管理",
+    "productVersion": "1.0.0",
+    "copyright": "Copyright © 2026",
+    "comments": "SVN 提交记录、功能变更与代码导出"
+  }
+}
