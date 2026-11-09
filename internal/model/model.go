@@ -22,10 +22,21 @@ type Feature struct {
 	CreatedAt   string `json:"createdAt"`
 	UpdatedAt   string `json:"updatedAt"`
 
+	AutoSync         bool  `json:"autoSync"`
+	LastSyncRevision int64 `json:"lastSyncRevision"`
+
 	// 列表页统计
 	DBChangeCount int `json:"dbChangeCount"`
 	RevisionCount int `json:"revisionCount"`
 	FileCount     int `json:"fileCount"`
+}
+
+// SyncResult 自动同步结果
+type SyncResult struct {
+	Added        int    `json:"added"`
+	Scanned      int    `json:"scanned"`
+	LastRevision int64  `json:"lastRevision"`
+	Message      string `json:"message"`
 }
 
 // DBChange 数据库结构变更明细

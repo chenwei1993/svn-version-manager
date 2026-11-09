@@ -94,6 +94,10 @@ export function SetDefaultExportDir(arg1) {
   return window['go']['main']['App']['SetDefaultExportDir'](arg1);
 }
 
+export function SetFeatureAutoSync(arg1, arg2) {
+  return window['go']['main']['App']['SetFeatureAutoSync'](arg1, arg2);
+}
+
 export function SetLogLimit(arg1) {
   return window['go']['main']['App']['SetLogLimit'](arg1);
 }
@@ -104,6 +108,10 @@ export function SetSvnAuthor(arg1) {
 
 export function SetSvnPath(arg1) {
   return window['go']['main']['App']['SetSvnPath'](arg1);
+}
+
+export function SyncFeature(arg1) {
+  return window['go']['main']['App']['SyncFeature'](arg1);
 }
 
 export function UnlinkRevision(arg1, arg2) {

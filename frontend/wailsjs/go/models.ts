@@ -81,6 +81,8 @@ export namespace model {
 	    status: string;
 	    createdAt: string;
 	    updatedAt: string;
+	    autoSync: boolean;
+	    lastSyncRevision: number;
 	    dbChangeCount: number;
 	    revisionCount: number;
 	    fileCount: number;
@@ -99,6 +101,8 @@ export namespace model {
 	        this.status = source["status"];
 	        this.createdAt = source["createdAt"];
 	        this.updatedAt = source["updatedAt"];
+	        this.autoSync = source["autoSync"];
+	        this.lastSyncRevision = source["lastSyncRevision"];
 	        this.dbChangeCount = source["dbChangeCount"];
 	        this.revisionCount = source["revisionCount"];
 	        this.fileCount = source["fileCount"];
@@ -279,6 +283,24 @@ export namespace model {
 	        this.available = source["available"];
 	        this.path = source["path"];
 	        this.version = source["version"];
+	        this.message = source["message"];
+	    }
+	}
+	export class SyncResult {
+	    added: number;
+	    scanned: number;
+	    lastRevision: number;
+	    message: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SyncResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.added = source["added"];
+	        this.scanned = source["scanned"];
+	        this.lastRevision = source["lastRevision"];
 	        this.message = source["message"];
 	    }
 	}

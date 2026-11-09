@@ -9,6 +9,7 @@ import {
   Edit,
   FolderOpened,
   Plus,
+  Refresh,
 } from '@element-plus/icons-vue'
 import { api } from '../api'
 import {
@@ -30,6 +31,13 @@ const detail = ref(null)
 const loading = ref(false)
 const saving = ref(false)
 const activeTab = ref('info')
+
+const autoSync = ref(false)
+const syncing = ref(false)
+const syncMessage = ref('')
+const myAuthor = ref('')
+const authorLoaded = ref(false)
+let autoSynced = false
 
 const form = reactive({ name: '', version: '', status: '开发中', description: '' })
 
@@ -95,6 +103,11 @@ async function load() {
     form.version = d.feature.version
     form.status = d.feature.status
     form.description = d.feature.description
+    autoSync.value = d.feature.autoSync
+    if (d.feature.autoSync && !autoSynced) {
+      autoSynced = true
+      syncNow(true)
+    }
     if (activeTab.value === 'export') nextTick(selectAllFiles)
   } catch (e) {
     props.notify('读取功能详情失败：' + errText(e), 'error')
@@ -107,6 +120,9 @@ watch(() => props.featureId, () => {
   activeTab.value = 'info'
   changeModalOpen.value = false
   selectedPaths.value = []
+  autoSync.value = false
+  syncMessage.value = ''
+  autoSynced = false
   load()
 }, { immediate: true })
 
@@ -114,10 +130,53 @@ onMounted(async () => {
   try {
     const s = await api.getAppSettings()
     if (s.defaultExportDir && !exportDir.value) exportDir.value = s.defaultExportDir
+    myAuthor.value = s.svnAuthor || ''
   } catch {
     // 忽略设置读取失败，用户仍可手动选择目录
+  } finally {
+    authorLoaded.value = true
   }
 })
+
+async function toggleAutoSync(enabled) {
+  try {
+    const f = await api.setFeatureAutoSync(props.featureId, enabled)
+    detail.value.feature = f
+    autoSync.value = f.autoSync
+    props.notify(enabled ? '已开启自动同步' : '已关闭自动同步')
+    if (enabled) {
+      autoSynced = true
+      await syncNow(false)
+    }
+  } catch (e) {
+    autoSync.value = !enabled
+    props.notify(errText(e), 'error')
+  }
+}
+
+async function syncNow(silent = false) {
+  if (syncing.value) return
+  syncing.value = true
+  syncMessage.value = ''
+  try {
+    const res = await api.syncFeature(props.featureId)
+    if (detail.value?.feature) detail.value.feature.lastSyncRevision = res.lastRevision
+    if (res.added > 0) {
+      syncMessage.value = res.message
+      props.notify(res.message)
+      await load()
+      emit('changed')
+    } else if (!silent) {
+      syncMessage.value = res.message
+      props.notify(res.message || '没有新提交', 'info')
+    }
+  } catch (e) {
+    syncMessage.value = errText(e)
+    if (!silent) props.notify(errText(e), 'error')
+  } finally {
+    syncing.value = false
+  }
+}
 
 async function saveInfo() {
   if (!form.name.trim()) return props.notify('功能名称不能为空', 'error')
@@ -400,6 +459,33 @@ async function openPath(p) {
               {{ detail.revisions.length }}
             </el-tag>
           </template>
+
+          <div class="sync-bar">
+            <div class="sync-main">
+              <el-switch v-model="autoSync" :loading="syncing" @change="toggleAutoSync" />
+              <span class="sync-label">自动同步新提交</span>
+              <span class="hint">
+                上次检查：{{ detail.feature.lastSyncRevision ? 'r' + detail.feature.lastSyncRevision : '—' }}
+              </span>
+              <el-tag v-if="authorLoaded && !myAuthor" type="warning" size="small">未配置 SVN 账号</el-tag>
+            </div>
+            <div class="sync-actions">
+              <el-button :icon="Refresh" :loading="syncing" @click="syncNow(false)">同步新提交</el-button>
+            </div>
+          </div>
+          <p class="hint" style="margin: -4px 0 14px">
+            开启后，打开该功能时会自动把「我的 SVN 账号」在已关联版本之后的新提交加入本功能。建议只对当前开发的功能开启。
+            <template v-if="authorLoaded && !myAuthor">请先在「设置 → SVN」中填写我的 SVN 账号。</template>
+          </p>
+          <el-alert
+            v-if="syncMessage"
+            type="info"
+            :closable="false"
+            show-icon
+            :title="syncMessage"
+            style="margin-bottom: 14px"
+          />
+
           <div class="section-head">
             <div>
               <h4>关联提交</h4>

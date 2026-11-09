@@ -537,6 +537,104 @@ func (a *App) DeleteFeature(id int64) error {
 	return st.DeleteFeature(id)
 }
 
+// SetFeatureAutoSync 设置功能是否自动同步新提交
+func (a *App) SetFeatureAutoSync(featureID int64, enabled bool) (model.Feature, error) {
+	st, err := a.db()
+	if err != nil {
+		return model.Feature{}, err
+	}
+	if err := st.SetFeatureAutoSync(featureID, enabled); err != nil {
+		return model.Feature{}, err
+	}
+	return st.GetFeature(featureID)
+}
+
+// SyncFeature 把「我的 SVN 账号」在已关联版本之后的新提交加入功能
+func (a *App) SyncFeature(featureID int64) (model.SyncResult, error) {
+	var result model.SyncResult
+	st, err := a.db()
+	if err != nil {
+		return result, err
+	}
+	feature, err := st.GetFeature(featureID)
+	if err != nil {
+		return result, fmt.Errorf("读取功能失败: %w", err)
+	}
+	project, err := st.GetProject(feature.ProjectID)
+	if err != nil {
+		return result, fmt.Errorf("读取项目失败: %w", err)
+	}
+	author := strings.TrimSpace(st.GetSetting("svn_author"))
+	if author == "" {
+		return result, fmt.Errorf("请先在「设置 → SVN」里填写我的 SVN 账号")
+	}
+	maxLinked, err := st.MaxFeatureRevision(featureID)
+	if err != nil {
+		return result, err
+	}
+	last := feature.LastSyncRevision
+	if maxLinked > last {
+		last = maxLinked
+	}
+
+	client := a.svn()
+	if last == 0 {
+		// 还没有任何关联版本：只记录当前 HEAD，避免把全部历史提交都拉进来
+		commits, err := client.Log(project.Path, 1)
+		if err != nil {
+			return result, err
+		}
+		head := int64(0)
+		if len(commits) > 0 {
+			head = commits[0].Revision
+		}
+		if err := st.SetFeatureLastSyncRevision(featureID, head); err != nil {
+			return result, err
+		}
+		result.LastRevision = head
+		result.Message = fmt.Sprintf("已记录当前版本 r%d，之后的新提交会自动同步", head)
+		return result, nil
+	}
+
+	const syncLogLimit = 1000
+	commits, err := client.Log(project.Path, syncLogLimit)
+	if err != nil {
+		return result, err
+	}
+	maxRev := last
+	scanned := 0
+	matched := make([]model.SvnCommit, 0)
+	for _, c := range commits {
+		if c.Revision <= last {
+			continue
+		}
+		scanned++
+		if c.Revision > maxRev {
+			maxRev = c.Revision
+		}
+		if c.Author == author {
+			matched = append(matched, c)
+		}
+	}
+	for _, c := range matched {
+		if err := st.LinkCommit(featureID, c); err != nil {
+			return result, fmt.Errorf("关联 r%d 失败: %w", c.Revision, err)
+		}
+	}
+	if err := st.SetFeatureLastSyncRevision(featureID, maxRev); err != nil {
+		return result, err
+	}
+	result.Added = len(matched)
+	result.Scanned = scanned
+	result.LastRevision = maxRev
+	if len(matched) == 0 {
+		result.Message = "没有属于你的新提交"
+	} else {
+		result.Message = fmt.Sprintf("已同步 %d 个新提交", len(matched))
+	}
+	return result, nil
+}
+
 func (a *App) GetFeatureDetail(id int64) (model.FeatureDetail, error) {
 	st, err := a.db()
 	if err != nil {

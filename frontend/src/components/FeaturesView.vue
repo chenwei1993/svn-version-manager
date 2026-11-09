@@ -170,7 +170,10 @@ function onGoSvn(featureId) {
         >
           <el-table-column label="功能" min-width="240">
             <template #default="{ row }">
-              <div class="cell-title">{{ row.name }}</div>
+              <div class="cell-title" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap">
+                {{ row.name }}
+                <el-tag v-if="row.autoSync" size="small" type="success" effect="plain">自动同步</el-tag>
+              </div>
               <div v-if="row.description" class="cell-sub">{{ row.description }}</div>
             </template>
           </el-table-column>

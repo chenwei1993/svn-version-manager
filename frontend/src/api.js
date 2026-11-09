@@ -38,6 +38,8 @@ export const api = {
   updateFeature: (feature) => call('UpdateFeature', feature),
   deleteFeature: (id) => call('DeleteFeature', id),
   getFeatureDetail: (id) => call('GetFeatureDetail', id),
+  setFeatureAutoSync: (id, enabled) => call('SetFeatureAutoSync', id, enabled),
+  syncFeature: (id) => call('SyncFeature', id),
 
   // 数据库变更
   addDBChange: (change) => call('AddDBChange', change),

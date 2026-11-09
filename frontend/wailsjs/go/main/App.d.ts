@@ -48,11 +48,15 @@ export function SaveAppSettings(arg1:model.AppSettings):Promise<model.SvnStatus>
 
 export function SetDefaultExportDir(arg1:string):Promise<void>;
 
+export function SetFeatureAutoSync(arg1:number,arg2:boolean):Promise<model.Feature>;
+
 export function SetLogLimit(arg1:number):Promise<void>;
 
 export function SetSvnAuthor(arg1:string):Promise<void>;
 
 export function SetSvnPath(arg1:string):Promise<model.SvnStatus>;
+
+export function SyncFeature(arg1:number):Promise<model.SyncResult>;
 
 export function UnlinkRevision(arg1:number,arg2:number):Promise<void>;
 

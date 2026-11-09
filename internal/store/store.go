@@ -62,6 +62,8 @@ func (s *Store) init() error {
 			version TEXT NOT NULL DEFAULT '',
 			description TEXT NOT NULL DEFAULT '',
 			status TEXT NOT NULL DEFAULT '开发中',
+			auto_sync INTEGER NOT NULL DEFAULT 0,
+			last_sync_revision INTEGER NOT NULL DEFAULT 0,
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL
 		);`,
@@ -105,7 +107,41 @@ func (s *Store) init() error {
 			return fmt.Errorf("初始化数据库失败: %w", err)
 		}
 	}
+	// 兼容旧版本数据库
+	migrations := []struct{ column, ddl string }{
+		{"auto_sync", "auto_sync INTEGER NOT NULL DEFAULT 0"},
+		{"last_sync_revision", "last_sync_revision INTEGER NOT NULL DEFAULT 0"},
+	}
+	for _, m := range migrations {
+		if err := s.addColumnIfMissing("features", m.column, m.ddl); err != nil {
+			return fmt.Errorf("迁移数据库失败: %w", err)
+		}
+	}
 	return nil
+}
+
+func (s *Store) addColumnIfMissing(table, column, ddl string) error {
+	rows, err := s.db.Query("PRAGMA table_info(" + table + ")")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid, notnull, pk int
+		var name, ctype string
+		var dflt sql.NullString
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+			return err
+		}
+		if name == column {
+			return nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	_, err = s.db.Exec("ALTER TABLE " + table + " ADD COLUMN " + ddl)
+	return err
 }
 
 // ---------- settings ----------
@@ -174,6 +210,7 @@ func (s *Store) DeleteProject(id int64) error {
 
 func (s *Store) ListFeatures(projectID int64) ([]model.Feature, error) {
 	rows, err := s.db.Query(`SELECT f.id, f.project_id, f.name, f.version, f.description, f.status, f.created_at, f.updated_at,
+		f.auto_sync, f.last_sync_revision,
 		(SELECT COUNT(*) FROM db_changes c WHERE c.feature_id = f.id),
 		(SELECT COUNT(*) FROM feature_revisions r WHERE r.feature_id = f.id),
 		(SELECT COUNT(*) FROM feature_files ff WHERE ff.feature_id = f.id)
@@ -185,10 +222,12 @@ func (s *Store) ListFeatures(projectID int64) ([]model.Feature, error) {
 	list := make([]model.Feature, 0)
 	for rows.Next() {
 		var f model.Feature
+		var autoSync int
 		if err := rows.Scan(&f.ID, &f.ProjectID, &f.Name, &f.Version, &f.Description, &f.Status, &f.CreatedAt, &f.UpdatedAt,
-			&f.DBChangeCount, &f.RevisionCount, &f.FileCount); err != nil {
+			&autoSync, &f.LastSyncRevision, &f.DBChangeCount, &f.RevisionCount, &f.FileCount); err != nil {
 			return nil, err
 		}
+		f.AutoSync = autoSync != 0
 		list = append(list, f)
 	}
 	return list, rows.Err()
@@ -196,9 +235,11 @@ func (s *Store) ListFeatures(projectID int64) ([]model.Feature, error) {
 
 func (s *Store) GetFeature(id int64) (model.Feature, error) {
 	var f model.Feature
-	err := s.db.QueryRow(`SELECT id, project_id, name, version, description, status, created_at, updated_at
+	var autoSync int
+	err := s.db.QueryRow(`SELECT id, project_id, name, version, description, status, created_at, updated_at, auto_sync, last_sync_revision
 		FROM features WHERE id = ?`, id).
-		Scan(&f.ID, &f.ProjectID, &f.Name, &f.Version, &f.Description, &f.Status, &f.CreatedAt, &f.UpdatedAt)
+		Scan(&f.ID, &f.ProjectID, &f.Name, &f.Version, &f.Description, &f.Status, &f.CreatedAt, &f.UpdatedAt, &autoSync, &f.LastSyncRevision)
+	f.AutoSync = autoSync != 0
 	return f, err
 }
 
@@ -227,6 +268,29 @@ func (s *Store) UpdateFeature(f model.Feature) error {
 func (s *Store) DeleteFeature(id int64) error {
 	_, err := s.db.Exec(`DELETE FROM features WHERE id = ?`, id)
 	return err
+}
+
+// SetFeatureAutoSync 开启/关闭功能的自动同步
+func (s *Store) SetFeatureAutoSync(id int64, enabled bool) error {
+	v := 0
+	if enabled {
+		v = 1
+	}
+	_, err := s.db.Exec(`UPDATE features SET auto_sync = ? WHERE id = ?`, v, id)
+	return err
+}
+
+// SetFeatureLastSyncRevision 记录已经同步到的版本
+func (s *Store) SetFeatureLastSyncRevision(id, revision int64) error {
+	_, err := s.db.Exec(`UPDATE features SET last_sync_revision = ? WHERE id = ?`, revision, id)
+	return err
+}
+
+// MaxFeatureRevision 返回功能已关联的最大版本号
+func (s *Store) MaxFeatureRevision(id int64) (int64, error) {
+	var rev int64
+	err := s.db.QueryRow(`SELECT COALESCE(MAX(revision), 0) FROM feature_revisions WHERE feature_id = ?`, id).Scan(&rev)
+	return rev, err
 }
 
 // ---------- db changes ----------
