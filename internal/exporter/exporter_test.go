@@ -55,6 +55,22 @@ func TestExportSelectedFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if _, err := st.AddDBChange(model.DBChange{
+		FeatureID: feature.ID, Kind: "add_table", TableName: "t_demo", Remark: "演示表",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.AddDBChange(model.DBChange{
+		FeatureID: feature.ID, Kind: "add_column", TableName: "t_demo", ColumnName: "id", DataType: "bigint", Remark: "主键",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.AddDBChange(model.DBChange{
+		FeatureID: feature.ID, Kind: "add_column", TableName: "t_order", ColumnName: "source", DataType: "tinyint", Remark: "订单来源",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
 	if err := st.LinkCommit(feature.ID, model.SvnCommit{
 		Revision: 10, Author: "tester", Date: "2026-01-01 10:00:00", Message: "init",
 		Files: []model.SvnChangedFile{
@@ -104,13 +120,33 @@ func TestExportSelectedFiles(t *testing.T) {
 	if strings.Contains(text, "b.go") {
 		t.Fatalf("manifest should not list b.go:\n%s", text)
 	}
+	if !strings.Contains(text, "数据库变更.sql") {
+		t.Fatalf("manifest should reference the SQL file:\n%s", text)
+	}
+	if res.SQLPath == "" {
+		t.Fatal("sql path should not be empty")
+	}
+	sqlContent, err := os.ReadFile(res.SQLPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sqlText := string(sqlContent)
+	if !strings.Contains(sqlText, "CREATE TABLE IF NOT EXISTS `t_demo`") {
+		t.Fatalf("sql should create t_demo:\n%s", sqlText)
+	}
+	if !strings.Contains(sqlText, "`id` bigint") {
+		t.Fatalf("sql should contain the t_demo column:\n%s", sqlText)
+	}
+	if !strings.Contains(sqlText, "ALTER TABLE `t_order` ADD COLUMN `source` tinyint") {
+		t.Fatalf("sql should alter t_order:\n%s", sqlText)
+	}
 	zr, err := zip.OpenReader(res.ZipPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer zr.Close()
-	if len(zr.File) != 2 {
-		t.Fatalf("zip entries = %d, want 2 (a.go + manifest)", len(zr.File))
+	if len(zr.File) != 3 {
+		t.Fatalf("zip entries = %d, want 3 (a.go + manifest + sql)", len(zr.File))
 	}
 
 	// 不传路径：导出全部

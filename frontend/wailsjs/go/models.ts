@@ -58,6 +58,7 @@ export namespace model {
 	    fileCount: number;
 	    skipped: string[];
 	    manifest: string;
+	    sqlPath: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ExportResult(source);
@@ -70,6 +71,7 @@ export namespace model {
 	        this.fileCount = source["fileCount"];
 	        this.skipped = source["skipped"];
 	        this.manifest = source["manifest"];
+	        this.sqlPath = source["sqlPath"];
 	    }
 	}
 	export class Feature {

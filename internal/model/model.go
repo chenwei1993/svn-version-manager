@@ -132,4 +132,5 @@ type ExportResult struct {
 	FileCount int      `json:"fileCount"`
 	Skipped   []string `json:"skipped"`
 	Manifest  string   `json:"manifest"`
+	SQLPath   string   `json:"sqlPath"`
 }

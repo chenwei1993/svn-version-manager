@@ -129,8 +129,17 @@ func (e *Exporter) ExportFeature(featureID int64, outDir string, onlyPaths []str
 		result.FileCount++
 	}
 
-	if result.FileCount == 0 {
+	if result.FileCount == 0 && len(detail.DBChanges) == 0 {
 		return result, fmt.Errorf("没有可导出的文件，请检查选中的文件是否已被删除")
+	}
+
+	if len(detail.DBChanges) > 0 {
+		sqlText := buildSQL(project, detail)
+		sqlPath := filepath.Join(folder, "数据库变更.sql")
+		if err := os.WriteFile(sqlPath, []byte(sqlText), 0o644); err != nil {
+			return result, fmt.Errorf("写入 SQL 脚本失败: %w", err)
+		}
+		result.SQLPath = sqlPath
 	}
 
 	manifest := buildManifest(project, detail, exported)
@@ -221,6 +230,10 @@ func buildManifest(project model.Project, d model.FeatureDetail, files map[strin
 				KindLabel(c.Kind), c.TableName, c.ColumnName, c.DataType, c.Remark)
 		}
 		b.WriteString("\n")
+	}
+
+	if len(d.DBChanges) > 0 {
+		b.WriteString("SQL 脚本：`数据库变更.sql`\n\n")
 	}
 
 	b.WriteString("## 关联提交\n\n")

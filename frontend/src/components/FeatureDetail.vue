@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   Clock,
   Delete,
+  Document,
   Download,
   Edit,
   FolderOpened,
@@ -418,7 +419,7 @@ async function openPath(p) {
           <div class="section-head">
             <div>
               <h4>数据库变更</h4>
-              <p class="hint">登记新增表、字段或索引，导出时会自动写入变更清单。</p>
+              <p class="hint">登记新增表、字段或索引，导出时会自动写入变更清单并生成 SQL；新增表下的字段会合并进 CREATE TABLE。</p>
             </div>
             <el-button type="primary" :icon="Plus" @click="openAddChange">添加变更</el-button>
           </div>
@@ -567,7 +568,7 @@ async function openPath(p) {
           <div class="section-head">
             <div>
               <h4>导出代码包</h4>
-              <p class="hint">勾选要导出的文件，按关联提交的版本从 SVN 导出，并生成变更清单和 zip。</p>
+              <p class="hint">勾选要导出的文件，按关联提交的版本从 SVN 导出，并生成变更清单和 zip。如登记了数据库变更，会自动生成「数据库变更.sql」。</p>
             </div>
           </div>
 
@@ -623,13 +624,15 @@ async function openPath(p) {
             <el-descriptions :column="1" border size="small">
               <el-descriptions-item label="导出目录">{{ exportResult.folder }}</el-descriptions-item>
               <el-descriptions-item label="压缩包">{{ exportResult.zipPath }}</el-descriptions-item>
-              <el-descriptions-item label="文件数量">{{ exportResult.fileCount }} 个</el-descriptions-item>
+              <el-descriptions-item label="代码文件">{{ exportResult.fileCount }} 个</el-descriptions-item>
+              <el-descriptions-item v-if="exportResult.sqlPath" label="SQL 脚本">{{ exportResult.sqlPath }}</el-descriptions-item>
             </el-descriptions>
             <div v-if="exportResult.skipped && exportResult.skipped.length" class="hint" style="margin-top: 8px">
               已跳过：{{ exportResult.skipped.join('；') }}
             </div>
             <div class="actions" style="margin-top: 12px">
               <el-button :icon="FolderOpened" @click="openPath(exportResult.folder)">打开导出目录</el-button>
+              <el-button v-if="exportResult.sqlPath" :icon="Document" @click="openPath(exportResult.sqlPath)">打开 SQL</el-button>
               <el-button :icon="Download" @click="openPath(exportResult.zipPath)">定位 ZIP</el-button>
             </div>
           </el-card>

@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { Download, FolderOpened, Search } from '@element-plus/icons-vue'
+import { Document, Download, FolderOpened, Search } from '@element-plus/icons-vue'
 import { api } from '../api'
 import { errText, statusTagType } from '../utils'
 
@@ -130,7 +130,7 @@ async function openPath(p) {
           </div>
         </div>
         <p class="hint" style="margin: 8px 0 0">
-          导出的是每个文件在关联提交中的版本快照，不受当前工作副本改动影响。需要挑选文件时，请进入功能详情的「导出」标签页。
+          导出的是每个文件在关联提交中的版本快照，不受当前工作副本改动影响。需要挑选文件时，请进入功能详情的「导出」标签页。如登记了数据库变更，会自动生成「数据库变更.sql」。
         </p>
       </el-card>
 
@@ -186,13 +186,15 @@ async function openPath(p) {
         <el-descriptions :column="1" border size="small">
           <el-descriptions-item label="导出目录">{{ result.folder }}</el-descriptions-item>
           <el-descriptions-item label="压缩包">{{ result.zipPath }}</el-descriptions-item>
-          <el-descriptions-item label="文件数量">{{ result.fileCount }} 个</el-descriptions-item>
+          <el-descriptions-item label="代码文件">{{ result.fileCount }} 个</el-descriptions-item>
+          <el-descriptions-item v-if="result.sqlPath" label="SQL 脚本">{{ result.sqlPath }}</el-descriptions-item>
         </el-descriptions>
         <div v-if="result.skipped && result.skipped.length" class="hint" style="margin-top: 8px">
           已跳过：{{ result.skipped.join('；') }}
         </div>
         <div class="actions" style="margin-top: 12px">
           <el-button :icon="FolderOpened" @click="openPath(result.folder)">打开导出目录</el-button>
+          <el-button v-if="result.sqlPath" :icon="Document" @click="openPath(result.sqlPath)">打开 SQL</el-button>
           <el-button :icon="Download" @click="openPath(result.zipPath)">定位 ZIP</el-button>
         </div>
       </el-card>
