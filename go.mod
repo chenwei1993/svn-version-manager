@@ -1,13 +1,16 @@
 module project-manage
 
-go 1.24
+go 1.24.0
 
 require (
+	github.com/go-sql-driver/mysql v1.10.1
 	github.com/wailsapp/wails/v2 v2.12.0
+	golang.org/x/sys v0.30.0
 	modernc.org/sqlite v1.34.5
 )
 
 require (
+	filippo.io/edwards25519 v1.2.0 // indirect
 	git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3 // indirect
 	github.com/bep/debounce v1.2.1 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
@@ -37,7 +40,6 @@ require (
 	github.com/wailsapp/mimetype v1.4.1 // indirect
 	golang.org/x/crypto v0.33.0 // indirect
 	golang.org/x/net v0.35.0 // indirect
-	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/text v0.22.0 // indirect
 	modernc.org/libc v1.55.3 // indirect
 	modernc.org/mathutil v1.6.0 // indirect

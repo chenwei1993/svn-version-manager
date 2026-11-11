@@ -22,11 +22,17 @@ export function ExportFeature(arg1:number,arg2:string,arg3:Array<string>):Promis
 
 export function GetAppSettings():Promise<model.AppSettings>;
 
+export function GetDatabaseSchema(arg1:number):Promise<Array<model.DBTable>>;
+
 export function GetFeatureDetail(arg1:number):Promise<model.FeatureDetail>;
+
+export function GetProjectDBConfig(arg1:number):Promise<model.DBConfig>;
 
 export function GetSvnAuthor():Promise<string>;
 
 export function GetSvnStatus():Promise<model.SvnStatus>;
+
+export function ImportDatabaseChanges(arg1:number,arg2:string,arg3:string,arg4:Array<string>):Promise<model.DBImportResult>;
 
 export function LinkCommits(arg1:number,arg2:Array<model.SvnCommit>):Promise<void>;
 
@@ -46,6 +52,8 @@ export function RefreshProject(arg1:number):Promise<model.Project>;
 
 export function SaveAppSettings(arg1:model.AppSettings):Promise<model.SvnStatus>;
 
+export function SaveProjectDBConfig(arg1:number,arg2:model.DBConfig):Promise<model.DBConfig>;
+
 export function SetDefaultExportDir(arg1:string):Promise<void>;
 
 export function SetFeatureAutoSync(arg1:number,arg2:boolean):Promise<model.Feature>;
@@ -57,6 +65,8 @@ export function SetSvnAuthor(arg1:string):Promise<void>;
 export function SetSvnPath(arg1:string):Promise<model.SvnStatus>;
 
 export function SyncFeature(arg1:number):Promise<model.SyncResult>;
+
+export function TestProjectDB(arg1:number,arg2:model.DBConfig):Promise<string>;
 
 export function UnlinkRevision(arg1:number,arg2:number):Promise<void>;
 

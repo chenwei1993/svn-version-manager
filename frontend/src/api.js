@@ -30,6 +30,14 @@ export const api = {
   updateProject: (project) => call('UpdateProject', project),
   refreshProject: (id) => call('RefreshProject', id),
   deleteProject: (id) => call('DeleteProject', id),
+  getProjectDBConfig: (projectId) => call('GetProjectDBConfig', projectId),
+  saveProjectDBConfig: (projectId, config) => call('SaveProjectDBConfig', projectId, config),
+  testProjectDB: (projectId, config) => call('TestProjectDB', projectId, config),
+
+  // 数据库结构
+  getDatabaseSchema: (projectId) => call('GetDatabaseSchema', projectId),
+  importDatabaseChanges: (featureId, tableName, mode, columns) =>
+    call('ImportDatabaseChanges', featureId, tableName, mode, columns),
 
   // 功能
   listFeatures: (projectId) => call('ListFeatures', projectId),

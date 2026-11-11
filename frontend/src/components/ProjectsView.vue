@@ -1,9 +1,10 @@
 <script setup>
 import { reactive, ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
-import { Plus, FolderOpened, Refresh, Edit, Delete } from '@element-plus/icons-vue'
+import { Plus, FolderOpened, Refresh, Edit, Delete, Coin } from '@element-plus/icons-vue'
 import { api } from '../api'
 import { errText } from '../utils'
+import DatabaseConfigDialog from './DatabaseConfigDialog.vue'
 
 const props = defineProps({
   projects: { type: Array, default: () => [] },
@@ -14,6 +15,7 @@ const emit = defineEmits(['refresh', 'select', 'deleted'])
 const modalOpen = ref(false)
 const editing = ref(null)
 const saving = ref(false)
+const dbProject = ref(null)
 const form = reactive({ name: '', path: '' })
 
 function openCreate() {
@@ -102,6 +104,10 @@ async function openFolder(p) {
     props.notify(errText(e), 'error')
   }
 }
+
+function onDBSaved() {
+  emit('refresh')
+}
 </script>
 
 <template>
@@ -128,6 +134,9 @@ async function openFolder(p) {
           <template #default="{ row }">
             <div class="cell-title">{{ row.name }}</div>
             <div class="cell-sub">{{ row.relative || '—' }}</div>
+            <el-tag v-if="row.dbConfigured" size="small" type="info" effect="plain" style="margin-top: 3px; align-self: flex-start">
+              DB: {{ row.dbName }}
+            </el-tag>
           </template>
         </el-table-column>
         <el-table-column label="工作副本路径" min-width="280" show-overflow-tooltip>
@@ -140,8 +149,11 @@ async function openFolder(p) {
             <span class="mono">{{ row.repoRoot || '未读取' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="160" align="right">
+        <el-table-column label="操作" width="200" align="right">
           <template #default="{ row }">
+            <el-tooltip content="数据库连接" placement="top">
+              <el-button link :icon="Coin" @click="dbProject = row" />
+            </el-tooltip>
             <el-tooltip content="打开目录" placement="top">
               <el-button link :icon="FolderOpened" @click="openFolder(row)" />
             </el-tooltip>
@@ -190,5 +202,13 @@ async function openFolder(p) {
         </el-button>
       </template>
     </el-dialog>
+
+    <DatabaseConfigDialog
+      v-if="dbProject"
+      :project="dbProject"
+      :notify="notify"
+      @close="dbProject = null"
+      @saved="onDBSaved"
+    />
   </div>
 </template>

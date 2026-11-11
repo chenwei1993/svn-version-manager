@@ -13,8 +13,10 @@ import (
 	"strings"
 	"sync"
 
+	"project-manage/internal/dbconn"
 	"project-manage/internal/exporter"
 	"project-manage/internal/model"
+	"project-manage/internal/secure"
 	"project-manage/internal/store"
 	"project-manage/internal/svnx"
 
@@ -490,6 +492,251 @@ func (a *App) DeleteProject(id int64) error {
 		return err
 	}
 	return st.DeleteProject(id)
+}
+
+// ---------- 项目数据库 ----------
+
+// GetProjectDBConfig 获取项目数据库配置（不返回明文密码）
+func (a *App) GetProjectDBConfig(projectID int64) (model.DBConfig, error) {
+	st, err := a.db()
+	if err != nil {
+		return model.DBConfig{}, err
+	}
+	host, port, user, password, database, err := st.GetProjectDBRaw(projectID)
+	if err != nil {
+		return model.DBConfig{}, fmt.Errorf("读取数据库配置失败: %w", err)
+	}
+	return model.DBConfig{
+		Host:        host,
+		Port:        port,
+		User:        user,
+		Database:    database,
+		HasPassword: password != "",
+	}, nil
+}
+
+// SaveProjectDBConfig 保存项目数据库配置，密码使用 DPAPI 加密
+func (a *App) SaveProjectDBConfig(projectID int64, cfg model.DBConfig) (model.DBConfig, error) {
+	st, err := a.db()
+	if err != nil {
+		return model.DBConfig{}, err
+	}
+	host := strings.TrimSpace(cfg.Host)
+	if host == "" {
+		host = "127.0.0.1"
+	}
+	database := strings.TrimSpace(cfg.Database)
+	if database == "" {
+		return model.DBConfig{}, fmt.Errorf("请填写数据库名")
+	}
+	port := cfg.Port
+	if port == 0 {
+		port = 3306
+	}
+
+	_, _, _, existing, _, err := st.GetProjectDBRaw(projectID)
+	if err != nil {
+		return model.DBConfig{}, fmt.Errorf("读取项目失败: %w", err)
+	}
+	encrypted := existing
+	if cfg.ClearPassword {
+		encrypted = ""
+	} else if cfg.Password != "" {
+		encrypted, err = secure.Encrypt(cfg.Password)
+		if err != nil {
+			return model.DBConfig{}, err
+		}
+	}
+	if err := st.SetProjectDB(projectID, host, port, strings.TrimSpace(cfg.User), encrypted, database); err != nil {
+		return model.DBConfig{}, err
+	}
+	return model.DBConfig{
+		Host:        host,
+		Port:        port,
+		User:        strings.TrimSpace(cfg.User),
+		Database:    database,
+		HasPassword: encrypted != "",
+	}, nil
+}
+
+// TestProjectDB 测试项目数据库连接；密码留空时使用已保存的密码
+func (a *App) TestProjectDB(projectID int64, cfg model.DBConfig) (string, error) {
+	password := cfg.Password
+	if password == "" && !cfg.ClearPassword {
+		st, err := a.db()
+		if err == nil {
+			_, _, _, encrypted, _, err := st.GetProjectDBRaw(projectID)
+			if err == nil && encrypted != "" {
+				password, err = secure.Decrypt(encrypted)
+				if err != nil {
+					return "", err
+				}
+			}
+		}
+	}
+	host := strings.TrimSpace(cfg.Host)
+	if host == "" {
+		host = "127.0.0.1"
+	}
+	port := cfg.Port
+	if port == 0 {
+		port = 3306
+	}
+	database := strings.TrimSpace(cfg.Database)
+	if database == "" {
+		return "", fmt.Errorf("请填写数据库名")
+	}
+	return dbconn.Test(dbconn.Config{
+		Host:     host,
+		Port:     port,
+		User:     strings.TrimSpace(cfg.User),
+		Password: password,
+		Database: database,
+	})
+}
+
+// GetDatabaseSchema 读取项目数据库的所有表和字段
+func (a *App) GetDatabaseSchema(projectID int64) ([]model.DBTable, error) {
+	cfg, err := a.projectDBConfig(projectID)
+	if err != nil {
+		return nil, err
+	}
+	return dbconn.Schema(cfg)
+}
+
+// ImportDatabaseChanges 从数据库表/字段导入变更记录
+func (a *App) ImportDatabaseChanges(featureID int64, tableName, mode string, columns []string) (model.DBImportResult, error) {
+	var result model.DBImportResult
+	st, err := a.db()
+	if err != nil {
+		return result, err
+	}
+	feature, err := st.GetFeature(featureID)
+	if err != nil {
+		return result, fmt.Errorf("读取功能失败: %w", err)
+	}
+	cfg, err := a.projectDBConfig(feature.ProjectID)
+	if err != nil {
+		return result, err
+	}
+	tableName = strings.TrimSpace(tableName)
+	if tableName == "" {
+		return result, fmt.Errorf("请选择表")
+	}
+	table, err := dbconn.TableSchema(cfg, tableName)
+	if err != nil {
+		return result, err
+	}
+
+	requested := make(map[string]bool, len(columns))
+	for _, c := range columns {
+		requested[c] = true
+	}
+	selected := make([]model.DBColumn, 0, len(table.Columns))
+	for _, col := range table.Columns {
+		if len(columns) == 0 || requested[col.Name] {
+			selected = append(selected, col)
+		}
+	}
+	if len(selected) == 0 {
+		return result, fmt.Errorf("请选择要导入的字段")
+	}
+
+	existing, err := st.ListDBChanges(featureID)
+	if err != nil {
+		return result, err
+	}
+	changes, skipped := buildDBImportChanges(featureID, existing, table, mode, selected)
+	result.Skipped = skipped
+	for _, c := range changes {
+		if _, err := st.AddDBChange(c); err != nil {
+			return result, err
+		}
+		result.Added++
+	}
+
+	if result.Added == 0 {
+		result.Message = "没有新增记录，可能已经导入过"
+	} else {
+		result.Message = fmt.Sprintf("已导入 %d 条变更记录", result.Added)
+	}
+	return result, nil
+}
+
+// buildDBImportChanges 根据数据库表结构和已有变更记录，生成待写入的变更记录
+func buildDBImportChanges(featureID int64, existing []model.DBChange, table model.DBTable, mode string, selected []model.DBColumn) ([]model.DBChange, int) {
+	keys := make(map[string]bool, len(existing))
+	for _, c := range existing {
+		switch c.Kind {
+		case "add_table":
+			keys["add_table|"+c.TableName] = true
+		case "add_column":
+			keys["add_column|"+c.TableName+"|"+c.ColumnName] = true
+		}
+	}
+
+	changes := make([]model.DBChange, 0, len(selected)+1)
+	skipped := 0
+	if mode == "table" {
+		key := "add_table|" + table.Name
+		if keys[key] {
+			skipped++
+		} else {
+			changes = append(changes, model.DBChange{
+				FeatureID: featureID,
+				Kind:      "add_table",
+				TableName: table.Name,
+				Remark:    table.Comment,
+			})
+			keys[key] = true
+		}
+	}
+
+	for _, col := range selected {
+		key := "add_column|" + table.Name + "|" + col.Name
+		if keys[key] {
+			skipped++
+			continue
+		}
+		changes = append(changes, model.DBChange{
+			FeatureID:  featureID,
+			Kind:       "add_column",
+			TableName:  table.Name,
+			ColumnName: col.Name,
+			DataType:   col.Type,
+			Remark:     col.Comment,
+		})
+		keys[key] = true
+	}
+	return changes, skipped
+}
+
+func (a *App) projectDBConfig(projectID int64) (dbconn.Config, error) {
+	st, err := a.db()
+	if err != nil {
+		return dbconn.Config{}, err
+	}
+	host, port, user, password, database, err := st.GetProjectDBRaw(projectID)
+	if err != nil {
+		return dbconn.Config{}, fmt.Errorf("读取数据库配置失败: %w", err)
+	}
+	if strings.TrimSpace(host) == "" || strings.TrimSpace(database) == "" {
+		return dbconn.Config{}, fmt.Errorf("请先在「项目管理」中配置该项目的数据库连接")
+	}
+	plain, err := secure.Decrypt(password)
+	if err != nil {
+		return dbconn.Config{}, err
+	}
+	if port == 0 {
+		port = 3306
+	}
+	return dbconn.Config{
+		Host:     strings.TrimSpace(host),
+		Port:     port,
+		User:     strings.TrimSpace(user),
+		Password: plain,
+		Database: strings.TrimSpace(database),
+	}, nil
 }
 
 // ---------- 功能记录 ----------

@@ -9,6 +9,9 @@ type Project struct {
 	RepoRoot  string `json:"repoRoot"`
 	Relative  string `json:"relative"`
 	CreatedAt string `json:"createdAt"`
+
+	DBName       string `json:"dbName"`
+	DBConfigured bool   `json:"dbConfigured"`
 }
 
 // Feature 一次功能开发记录
@@ -37,6 +40,42 @@ type SyncResult struct {
 	Scanned      int    `json:"scanned"`
 	LastRevision int64  `json:"lastRevision"`
 	Message      string `json:"message"`
+}
+
+// DBConfig 项目数据库连接配置
+type DBConfig struct {
+	Host          string `json:"host"`
+	Port          int    `json:"port"`
+	User          string `json:"user"`
+	Password      string `json:"password"`
+	Database      string `json:"database"`
+	HasPassword   bool   `json:"hasPassword"`
+	ClearPassword bool   `json:"clearPassword"`
+}
+
+// DBColumn 数据库字段信息
+type DBColumn struct {
+	Name     string `json:"name"`
+	Type     string `json:"type"`
+	Nullable string `json:"nullable"`
+	Default  string `json:"default"`
+	Comment  string `json:"comment"`
+	Key      string `json:"key"`
+	Extra    string `json:"extra"`
+}
+
+// DBTable 数据库表信息
+type DBTable struct {
+	Name    string     `json:"name"`
+	Comment string     `json:"comment"`
+	Columns []DBColumn `json:"columns"`
+}
+
+// DBImportResult 从数据库导入变更的结果
+type DBImportResult struct {
+	Added   int    `json:"added"`
+	Skipped int    `json:"skipped"`
+	Message string `json:"message"`
 }
 
 // DBChange 数据库结构变更明细

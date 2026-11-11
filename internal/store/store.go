@@ -53,6 +53,11 @@ func (s *Store) init() error {
 			repo_url TEXT NOT NULL DEFAULT '',
 			repo_root TEXT NOT NULL DEFAULT '',
 			relative TEXT NOT NULL DEFAULT '',
+			db_host TEXT NOT NULL DEFAULT '',
+			db_port INTEGER NOT NULL DEFAULT 3306,
+			db_user TEXT NOT NULL DEFAULT '',
+			db_password TEXT NOT NULL DEFAULT '',
+			db_name TEXT NOT NULL DEFAULT '',
 			created_at TEXT NOT NULL
 		);`,
 		`CREATE TABLE IF NOT EXISTS features (
@@ -117,6 +122,18 @@ func (s *Store) init() error {
 			return fmt.Errorf("迁移数据库失败: %w", err)
 		}
 	}
+	projectMigrations := []struct{ column, ddl string }{
+		{"db_host", "db_host TEXT NOT NULL DEFAULT ''"},
+		{"db_port", "db_port INTEGER NOT NULL DEFAULT 3306"},
+		{"db_user", "db_user TEXT NOT NULL DEFAULT ''"},
+		{"db_password", "db_password TEXT NOT NULL DEFAULT ''"},
+		{"db_name", "db_name TEXT NOT NULL DEFAULT ''"},
+	}
+	for _, m := range projectMigrations {
+		if err := s.addColumnIfMissing("projects", m.column, m.ddl); err != nil {
+			return fmt.Errorf("迁移项目数据库失败: %w", err)
+		}
+	}
 	return nil
 }
 
@@ -161,7 +178,9 @@ func (s *Store) SetSetting(key, value string) error {
 // ---------- projects ----------
 
 func (s *Store) ListProjects() ([]model.Project, error) {
-	rows, err := s.db.Query(`SELECT id, name, path, repo_url, repo_root, relative, created_at FROM projects ORDER BY id DESC`)
+	rows, err := s.db.Query(`SELECT id, name, path, repo_url, repo_root, relative, created_at, db_name,
+		CASE WHEN db_host != '' AND db_name != '' THEN 1 ELSE 0 END
+		FROM projects ORDER BY id DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -169,9 +188,11 @@ func (s *Store) ListProjects() ([]model.Project, error) {
 	list := make([]model.Project, 0)
 	for rows.Next() {
 		var p model.Project
-		if err := rows.Scan(&p.ID, &p.Name, &p.Path, &p.RepoURL, &p.RepoRoot, &p.Relative, &p.CreatedAt); err != nil {
+		var dbConfigured int
+		if err := rows.Scan(&p.ID, &p.Name, &p.Path, &p.RepoURL, &p.RepoRoot, &p.Relative, &p.CreatedAt, &p.DBName, &dbConfigured); err != nil {
 			return nil, err
 		}
+		p.DBConfigured = dbConfigured != 0
 		list = append(list, p)
 	}
 	return list, rows.Err()
@@ -179,8 +200,12 @@ func (s *Store) ListProjects() ([]model.Project, error) {
 
 func (s *Store) GetProject(id int64) (model.Project, error) {
 	var p model.Project
-	err := s.db.QueryRow(`SELECT id, name, path, repo_url, repo_root, relative, created_at FROM projects WHERE id = ?`, id).
-		Scan(&p.ID, &p.Name, &p.Path, &p.RepoURL, &p.RepoRoot, &p.Relative, &p.CreatedAt)
+	var dbConfigured int
+	err := s.db.QueryRow(`SELECT id, name, path, repo_url, repo_root, relative, created_at, db_name,
+		CASE WHEN db_host != '' AND db_name != '' THEN 1 ELSE 0 END
+		FROM projects WHERE id = ?`, id).
+		Scan(&p.ID, &p.Name, &p.Path, &p.RepoURL, &p.RepoRoot, &p.Relative, &p.CreatedAt, &p.DBName, &dbConfigured)
+	p.DBConfigured = dbConfigured != 0
 	return p, err
 }
 
@@ -203,6 +228,20 @@ func (s *Store) UpdateProject(p model.Project) error {
 
 func (s *Store) DeleteProject(id int64) error {
 	_, err := s.db.Exec(`DELETE FROM projects WHERE id = ?`, id)
+	return err
+}
+
+// GetProjectDBRaw 读取项目的数据库连接（密码为加密后的密文）
+func (s *Store) GetProjectDBRaw(id int64) (host string, port int, user, password, database string, err error) {
+	err = s.db.QueryRow(`SELECT db_host, db_port, db_user, db_password, db_name FROM projects WHERE id = ?`, id).
+		Scan(&host, &port, &user, &password, &database)
+	return
+}
+
+// SetProjectDB 保存项目的数据库连接
+func (s *Store) SetProjectDB(id int64, host string, port int, user, password, database string) error {
+	_, err := s.db.Exec(`UPDATE projects SET db_host = ?, db_port = ?, db_user = ?, db_password = ?, db_name = ? WHERE id = ?`,
+		host, port, user, password, database, id)
 	return err
 }
 

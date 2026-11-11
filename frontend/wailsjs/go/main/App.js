@@ -42,8 +42,16 @@ export function GetAppSettings() {
   return window['go']['main']['App']['GetAppSettings']();
 }
 
+export function GetDatabaseSchema(arg1) {
+  return window['go']['main']['App']['GetDatabaseSchema'](arg1);
+}
+
 export function GetFeatureDetail(arg1) {
   return window['go']['main']['App']['GetFeatureDetail'](arg1);
+}
+
+export function GetProjectDBConfig(arg1) {
+  return window['go']['main']['App']['GetProjectDBConfig'](arg1);
 }
 
 export function GetSvnAuthor() {
@@ -52,6 +60,10 @@ export function GetSvnAuthor() {
 
 export function GetSvnStatus() {
   return window['go']['main']['App']['GetSvnStatus']();
+}
+
+export function ImportDatabaseChanges(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['ImportDatabaseChanges'](arg1, arg2, arg3, arg4);
 }
 
 export function LinkCommits(arg1, arg2) {
@@ -90,6 +102,10 @@ export function SaveAppSettings(arg1) {
   return window['go']['main']['App']['SaveAppSettings'](arg1);
 }
 
+export function SaveProjectDBConfig(arg1, arg2) {
+  return window['go']['main']['App']['SaveProjectDBConfig'](arg1, arg2);
+}
+
 export function SetDefaultExportDir(arg1) {
   return window['go']['main']['App']['SetDefaultExportDir'](arg1);
 }
@@ -112,6 +128,10 @@ export function SetSvnPath(arg1) {
 
 export function SyncFeature(arg1) {
   return window['go']['main']['App']['SyncFeature'](arg1);
+}
+
+export function TestProjectDB(arg1, arg2) {
+  return window['go']['main']['App']['TestProjectDB'](arg1, arg2);
 }
 
 export function UnlinkRevision(arg1, arg2) {

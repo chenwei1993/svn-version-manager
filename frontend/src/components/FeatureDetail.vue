@@ -4,6 +4,7 @@ import { ElMessageBox } from 'element-plus'
 import {
   ArrowLeft,
   Clock,
+  Coin,
   Delete,
   Document,
   Download,
@@ -20,6 +21,7 @@ import {
   statusList,
   statusTagType,
 } from '../utils'
+import ImportDBChangesDialog from './ImportDBChangesDialog.vue'
 
 const props = defineProps({
   featureId: { type: Number, required: true },
@@ -46,6 +48,7 @@ const emptyChange = () => ({ kind: 'add_column', tableName: '', columnName: '', 
 const change = reactive(emptyChange())
 const editingChangeId = ref(0)
 const changeModalOpen = ref(false)
+const importDBOpen = ref(false)
 
 const exportDir = ref('')
 const exporting = ref(false)
@@ -287,6 +290,11 @@ async function removeChange(c) {
   }
 }
 
+async function onDBImported() {
+  await load()
+  emit('changed')
+}
+
 async function unlinkRevision(r) {
   try {
     await ElMessageBox.confirm(
@@ -419,9 +427,12 @@ async function openPath(p) {
           <div class="section-head">
             <div>
               <h4>数据库变更</h4>
-              <p class="hint">登记新增表、字段或索引，导出时会自动写入变更清单并生成 SQL；新增表下的字段会合并进 CREATE TABLE。</p>
+              <p class="hint">登记新增表、字段或索引；也可以直接从数据库选择表和字段。导出时会生成 SQL，新增表下的字段会合并进 CREATE TABLE。</p>
             </div>
-            <el-button type="primary" :icon="Plus" @click="openAddChange">添加变更</el-button>
+            <div class="actions">
+              <el-button :icon="Coin" @click="importDBOpen = true">从数据库导入</el-button>
+              <el-button type="primary" :icon="Plus" @click="openAddChange">添加变更</el-button>
+            </div>
           </div>
           <el-table v-if="detail.dbChanges.length" :data="detail.dbChanges" style="width: 100%">
             <el-table-column label="类型" width="110">
@@ -689,5 +700,14 @@ async function openPath(p) {
         </el-button>
       </template>
     </el-dialog>
+
+    <ImportDBChangesDialog
+      v-if="importDBOpen"
+      :feature-id="featureId"
+      :project-id="project?.id || 0"
+      :notify="notify"
+      @close="importDBOpen = false"
+      @imported="onDBImported"
+    />
   </div>
 </template>

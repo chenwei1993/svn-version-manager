@@ -52,6 +52,104 @@ export namespace model {
 	        this.createdAt = source["createdAt"];
 	    }
 	}
+	export class DBColumn {
+	    name: string;
+	    type: string;
+	    nullable: string;
+	    default: string;
+	    comment: string;
+	    key: string;
+	    extra: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DBColumn(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.type = source["type"];
+	        this.nullable = source["nullable"];
+	        this.default = source["default"];
+	        this.comment = source["comment"];
+	        this.key = source["key"];
+	        this.extra = source["extra"];
+	    }
+	}
+	export class DBConfig {
+	    host: string;
+	    port: number;
+	    user: string;
+	    password: string;
+	    database: string;
+	    hasPassword: boolean;
+	    clearPassword: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new DBConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.host = source["host"];
+	        this.port = source["port"];
+	        this.user = source["user"];
+	        this.password = source["password"];
+	        this.database = source["database"];
+	        this.hasPassword = source["hasPassword"];
+	        this.clearPassword = source["clearPassword"];
+	    }
+	}
+	export class DBImportResult {
+	    added: number;
+	    skipped: number;
+	    message: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DBImportResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.added = source["added"];
+	        this.skipped = source["skipped"];
+	        this.message = source["message"];
+	    }
+	}
+	export class DBTable {
+	    name: string;
+	    comment: string;
+	    columns: DBColumn[];
+	
+	    static createFrom(source: any = {}) {
+	        return new DBTable(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.comment = source["comment"];
+	        this.columns = this.convertValues(source["columns"], DBColumn);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class ExportResult {
 	    folder: string;
 	    zipPath: string;
@@ -200,6 +298,8 @@ export namespace model {
 	    repoRoot: string;
 	    relative: string;
 	    createdAt: string;
+	    dbName: string;
+	    dbConfigured: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Project(source);
@@ -214,6 +314,8 @@ export namespace model {
 	        this.repoRoot = source["repoRoot"];
 	        this.relative = source["relative"];
 	        this.createdAt = source["createdAt"];
+	        this.dbName = source["dbName"];
+	        this.dbConfigured = source["dbConfigured"];
 	    }
 	}
 	export class SvnChangedFile {
