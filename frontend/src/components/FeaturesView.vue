@@ -1,8 +1,12 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
-import { Plus, Search } from '@element-plus/icons-vue'
+import AppIcon from './AppIcon.vue'
+import {
+  IconPlus as Plus,
+  IconSearch as Search,
+} from './icons'
 import { api } from '../api'
-import { errText, statusList, statusTagType } from '../utils'
+import { errText, statusList } from '../utils'
 import FeatureDetail from './FeatureDetail.vue'
 
 const props = defineProps({
@@ -33,6 +37,44 @@ const filtered = computed(() => {
   })
 })
 
+const statusCounts = computed(() => {
+  const map = {}
+  for (const f of features.value) map[f.status] = (map[f.status] || 0) + 1
+  return map
+})
+
+const statusStats = computed(() =>
+  statusList
+    .filter((s) => statusCounts.value[s])
+    .map((s) => ({ label: s, count: statusCounts.value[s], cls: rowStatusClass(s) }))
+)
+
+const statusChips = computed(() => statusList.filter((s) => statusCounts.value[s]))
+
+const doneCount = computed(
+  () => (statusCounts.value['已完成'] || 0) + (statusCounts.value['已发布'] || 0)
+)
+const progress = computed(() =>
+  features.value.length ? Math.round((doneCount.value / features.value.length) * 100) : 0
+)
+const currentVersion = computed(() => {
+  const versions = [...new Set(features.value.map((f) => f.version).filter(Boolean))]
+  versions.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+  return versions[versions.length - 1] || '—'
+})
+const dbTotal = computed(() => features.value.reduce((n, f) => n + (f.dbChangeCount || 0), 0))
+const fileTotal = computed(() => features.value.reduce((n, f) => n + (f.fileCount || 0), 0))
+
+function rowStatusClass(status) {
+  if (status === '已完成' || status === '已发布') return 'done'
+  if (status === '已暂停') return 'archived'
+  return 'dev'
+}
+
+function shortTime(value) {
+  return (value || '').slice(5, 16) || '—'
+}
+
 async function load() {
   if (!props.project) {
     features.value = []
@@ -54,6 +96,8 @@ async function load() {
 
 watch(() => props.project?.id, () => {
   selectedId.value = 0
+  statusFilter.value = ''
+  keyword.value = ''
   load()
 }, { immediate: true })
 
@@ -115,108 +159,127 @@ function onGoSvn(featureId) {
   <div v-else class="view">
     <div class="view-head">
       <div class="view-title">
-        <h2>功能记录</h2>
-        <p>按功能管理开发内容、数据库变更和关联的 SVN 提交。</p>
+        <div class="title-row">
+          <h2>功能记录</h2>
+          <span v-if="features.length" class="count-badge">{{ features.length }} 个功能</span>
+        </div>
+        <p>按功能组织 SVN 提交、数据库变更与导出内容</p>
       </div>
       <div class="actions">
         <el-button type="primary" :icon="Plus" :disabled="!project" @click="openCreate">新建功能</el-button>
       </div>
     </div>
 
-    <el-card v-if="!project" shadow="never" class="panel">
-      <el-empty description="请先选择项目">
-        <span class="hint">在顶部下拉框选择一个项目，或先到「项目管理」添加。</span>
-      </el-empty>
-    </el-card>
+    <div v-if="!project" class="panel empty-state">
+      <div class="empty-icon"><AppIcon name="search" :size="20" /></div>
+      <h4>请先选择项目</h4>
+      <p>在顶部选择一个项目，或先到「项目管理」添加工作副本</p>
+    </div>
 
     <template v-else>
-      <el-card shadow="never" class="panel toolbar-card">
-        <div class="toolbar">
-          <div class="toolbar-left">
-            <el-input
-              v-model="keyword"
-              :prefix-icon="Search"
-              placeholder="搜索功能名称 / 版本 / 说明"
-              clearable
-              style="width: 280px"
-            />
-            <el-select v-model="statusFilter" placeholder="全部状态" clearable style="width: 130px">
-              <el-option label="全部状态" value="" />
-              <el-option v-for="s in statusList" :key="s" :label="s" :value="s" />
-            </el-select>
+      <div class="feature-layout">
+        <div class="panel feature-list-panel">
+          <div class="list-toolbar">
+            <div class="chips">
+              <button class="chip" :class="{ active: statusFilter === '' }" @click="statusFilter = ''">
+                全部 {{ features.length }}
+              </button>
+              <button
+                v-for="s in statusChips"
+                :key="s"
+                class="chip"
+                :class="{ active: statusFilter === s }"
+                @click="statusFilter = s"
+              >
+                {{ s }} {{ statusCounts[s] || 0 }}
+              </button>
+            </div>
+            <div class="toolbar-right">
+              <el-input
+                v-model="keyword"
+                :prefix-icon="Search"
+                placeholder="搜索功能名称"
+                clearable
+                style="width: 188px"
+              />
+            </div>
           </div>
-          <span class="hint">共 {{ filtered.length }} 个功能</span>
+
+          <div v-if="loading" class="empty-state">
+            <p>正在读取功能记录…</p>
+          </div>
+
+          <div v-else-if="!features.length" class="empty-state">
+            <div class="empty-icon"><AppIcon name="plus" :size="20" /></div>
+            <h4>还没有功能记录</h4>
+            <p>新建一个功能，开始关联 SVN 提交与数据库变更</p>
+            <el-button type="primary" :icon="Plus" @click="openCreate">新建功能</el-button>
+          </div>
+
+          <div v-else-if="!filtered.length" class="empty-state">
+            <div class="empty-icon"><AppIcon name="search" :size="20" /></div>
+            <h4>没有匹配的功能</h4>
+            <p>换个关键词或状态筛选试试</p>
+          </div>
+
+          <div v-else class="feature-rows">
+            <button
+              v-for="f in filtered"
+              :key="f.id"
+              class="feature-row"
+              @click="openFeature(f)"
+            >
+              <span class="feature-accent" :class="rowStatusClass(f.status)"></span>
+              <span class="feature-main">
+                <span class="feature-name">
+                  {{ f.name }}
+                  <el-tag v-if="f.autoSync" type="success" size="small">自动同步</el-tag>
+                </span>
+                <span class="feature-desc">{{ f.description || '暂无功能说明' }}</span>
+              </span>
+              <span class="feature-version">{{ f.version || '—' }}</span>
+              <span class="status-tag" :class="rowStatusClass(f.status)">{{ f.status }}</span>
+              <span class="feature-meta">
+                数据库 {{ f.dbChangeCount || 0 }} · 提交 {{ f.revisionCount || 0 }}
+              </span>
+              <span class="feature-time">{{ shortTime(f.updatedAt) }}</span>
+              <AppIcon class="feature-chevron" name="chevronRight" :size="14" />
+            </button>
+          </div>
+
+          <div class="list-footer">
+            <span>显示 {{ filtered.length }} / {{ features.length }} 个功能</span>
+            <span>点击功能行查看数据库变更、提交记录与导出</span>
+          </div>
         </div>
-      </el-card>
 
-      <el-card v-if="!loading && features.length === 0" shadow="never" class="panel" style="margin-top: 14px">
-        <el-empty description="还没有功能记录">
-          <el-button type="primary" :icon="Plus" @click="openCreate">新建功能</el-button>
-        </el-empty>
-      </el-card>
-
-      <el-card v-else-if="!loading && filtered.length === 0" shadow="never" class="panel" style="margin-top: 14px">
-        <el-empty description="没有匹配的功能" />
-      </el-card>
-
-      <el-card v-else shadow="never" class="panel table-panel" style="margin-top: 14px">
-        <el-table
-          v-loading="loading"
-          :data="filtered"
-          class="clickable-table"
-          row-key="id"
-          style="width: 100%"
-          @row-click="openFeature"
-        >
-          <el-table-column label="功能" min-width="240">
-            <template #default="{ row }">
-              <div class="cell-title" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap">
-                {{ row.name }}
-                <el-tag v-if="row.autoSync" size="small" type="success" effect="plain">自动同步</el-tag>
-              </div>
-              <div v-if="row.description" class="cell-sub">{{ row.description }}</div>
-            </template>
-          </el-table-column>
-          <el-table-column label="版本 / 迭代" width="120">
-            <template #default="{ row }">
-              <span class="muted">{{ row.version || '—' }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="状态" width="100">
-            <template #default="{ row }">
-              <el-tag :type="statusTagType(row.status)" size="small">{{ row.status }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="数据库" width="90" align="center">
-            <template #default="{ row }">
-              <el-tag v-if="row.dbChangeCount" type="info" size="small" effect="plain">{{ row.dbChangeCount }}</el-tag>
-              <span v-else class="muted">—</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="提交" width="80" align="center">
-            <template #default="{ row }">
-              <el-tag v-if="row.revisionCount" type="info" size="small" effect="plain">{{ row.revisionCount }}</el-tag>
-              <span v-else class="muted">—</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="文件" width="80" align="center">
-            <template #default="{ row }">
-              <el-tag v-if="row.fileCount" type="info" size="small" effect="plain">{{ row.fileCount }}</el-tag>
-              <span v-else class="muted">—</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="更新时间" width="170">
-            <template #default="{ row }">
-              <span class="hint">{{ row.updatedAt }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="90" align="right">
-            <template #default="{ row }">
-              <el-button link type="primary" @click.stop="openFeature(row)">打开</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-      </el-card>
+        <aside class="panel feature-aside">
+          <div class="aside-head">
+            <h3>本迭代概览</h3>
+            <span class="mono">{{ currentVersion }}</span>
+          </div>
+          <div class="progress-row">
+            <span class="big">{{ progress }}%</span>
+            <span class="hint">完成度</span>
+          </div>
+          <div class="progress-track">
+            <span :style="{ width: progress + '%' }"></span>
+          </div>
+          <div class="aside-stats">
+            <div v-for="s in statusStats" :key="s.label" class="aside-stat">
+              <span class="dot" :class="s.cls"></span>
+              <span>{{ s.label }}</span>
+              <strong>{{ s.count }}</strong>
+            </div>
+          </div>
+          <div class="aside-divider"></div>
+          <div class="aside-meta"><span>数据库变更</span><strong>{{ dbTotal }} 条</strong></div>
+          <div class="aside-meta"><span>关联文件</span><strong>{{ fileTotal }} 个</strong></div>
+          <div class="aside-tip">
+            在功能详情中可直接从项目数据库导入表和字段，自动带出类型与注释。
+          </div>
+        </aside>
+      </div>
     </template>
 
     <el-dialog v-model="createOpen" title="新建功能记录" width="560px" :close-on-click-modal="false">

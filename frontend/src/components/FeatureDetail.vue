@@ -1,25 +1,25 @@
 <script setup>
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessageBox } from 'element-plus'
+import AppIcon from './AppIcon.vue'
 import {
-  ArrowLeft,
-  Clock,
-  Coin,
-  Delete,
-  Document,
-  Download,
-  Edit,
-  FolderOpened,
-  Plus,
-  Refresh,
-} from '@element-plus/icons-vue'
+  IconArrowLeft as ArrowLeft,
+  IconClock as Clock,
+  IconDatabase as Coin,
+  IconDownload as Download,
+  IconEdit as Edit,
+  IconFile as Document,
+  IconFolder as FolderOpened,
+  IconPlus as Plus,
+  IconRefresh as Refresh,
+  IconTrash as Delete,
+} from './icons'
 import { api } from '../api'
 import {
   actionTagType,
   errText,
   kindLabel,
   statusList,
-  statusTagType,
 } from '../utils'
 import ImportDBChangesDialog from './ImportDBChangesDialog.vue'
 
@@ -75,6 +75,12 @@ const revFileCounts = computed(() => {
 
 function filesByRevision(revision) {
   return (detail.value?.files || []).filter((f) => f.revision === revision)
+}
+
+function featureStatusClass(status) {
+  if (status === '已完成' || status === '已发布') return 'done'
+  if (status === '已暂停') return 'archived'
+  return 'dev'
 }
 
 function selectAllFiles() {
@@ -359,27 +365,40 @@ async function openPath(p) {
 
 <template>
   <div v-if="loading && !detail" class="view">
-    <el-card v-loading="true" shadow="never" class="panel" style="height: 220px" />
+    <div v-loading="true" class="panel detail-loading"></div>
   </div>
 
   <div v-else-if="detail" class="view detail-page">
-    <div class="detail-topbar">
-      <el-button :icon="ArrowLeft" circle plain title="返回功能列表" @click="emit('back')" />
-      <div class="detail-title">
-        <h2>{{ detail.feature.name }}</h2>
-        <div class="detail-sub">
-          <el-tag :type="statusTagType(detail.feature.status)" size="small">{{ detail.feature.status }}</el-tag>
-          <span>{{ project?.name }}</span>
-          <span v-if="detail.feature.version">· {{ detail.feature.version }}</span>
-          <span>· 更新于 {{ detail.feature.updatedAt }}</span>
+    <div class="detail-head">
+      <button class="back-link" @click="emit('back')">
+        <el-icon><ArrowLeft /></el-icon>
+        返回功能列表
+      </button>
+
+      <div class="panel detail-hero">
+        <div class="hero-main">
+          <div class="hero-title">
+            <h2>{{ detail.feature.name }}</h2>
+            <span class="status-tag" :class="featureStatusClass(detail.feature.status)">
+              {{ detail.feature.status }}
+            </span>
+            <span v-if="detail.feature.version" class="version-tag">{{ detail.feature.version }}</span>
+          </div>
+          <p class="hero-desc">{{ detail.feature.description || '暂无功能说明' }}</p>
+          <div class="hero-meta">
+            创建于 {{ detail.feature.createdAt }} · {{ detail.revisions.length }} 个提交 ·
+            {{ detail.files.length }} 个文件 · 数据库变更 {{ detail.dbChanges.length }} 项
+          </div>
         </div>
-      </div>
-      <div class="actions">
-        <el-button type="danger" plain :icon="Delete" @click="removeFeature">删除</el-button>
+        <div class="hero-actions">
+          <el-button :icon="Clock" @click="activeTab = 'svn'">去关联提交</el-button>
+          <el-button :icon="Download" @click="activeTab = 'export'">导出代码包</el-button>
+          <el-button type="danger" plain :icon="Delete" @click="removeFeature">删除</el-button>
+        </div>
       </div>
     </div>
 
-    <el-card shadow="never" class="panel detail-card">
+    <div class="panel detail-body">
       <el-tabs v-model="activeTab" class="detail-tabs">
         <el-tab-pane label="基本信息" name="info">
           <div class="section-head">
@@ -426,7 +445,10 @@ async function openPath(p) {
           </template>
           <div class="section-head">
             <div>
-              <h4>数据库变更</h4>
+              <h4>
+                数据库变更
+                <span class="section-title-tag">{{ detail.dbChanges.length }} 项</span>
+              </h4>
               <p class="hint">登记新增表、字段或索引；也可以直接从数据库选择表和字段。导出时会生成 SQL，新增表下的字段会合并进 CREATE TABLE。</p>
             </div>
             <div class="actions">
@@ -434,10 +456,15 @@ async function openPath(p) {
               <el-button type="primary" :icon="Plus" @click="openAddChange">添加变更</el-button>
             </div>
           </div>
+          <div v-if="project?.dbConfigured" class="db-banner">
+            <span class="status-dot"></span>
+            已连接 {{ project.dbName }}
+            <span class="link" @click="importDBOpen = true">重新读取表结构</span>
+          </div>
           <el-table v-if="detail.dbChanges.length" :data="detail.dbChanges" style="width: 100%">
             <el-table-column label="类型" width="110">
               <template #default="{ row }">
-                <el-tag :type="row.kind === 'add_table' ? 'success' : 'info'" size="small">
+                <el-tag size="small" :class="`kind-${row.kind}`">
                   {{ kindLabel(row.kind) }}
                 </el-tag>
               </template>
@@ -454,14 +481,23 @@ async function openPath(p) {
             <el-table-column prop="remark" label="说明" min-width="180" show-overflow-tooltip />
             <el-table-column label="操作" width="100" align="right">
               <template #default="{ row }">
-                <el-button link :icon="Edit" @click="openEditChange(row)" />
-                <el-button link type="danger" :icon="Delete" @click="removeChange(row)" />
+                <div class="row-actions">
+                  <button class="icon-button sm" title="编辑" @click="openEditChange(row)">
+                    <el-icon><Edit /></el-icon>
+                  </button>
+                  <button class="icon-button sm danger" title="删除" @click="removeChange(row)">
+                    <el-icon><Delete /></el-icon>
+                  </button>
+                </div>
               </template>
             </el-table-column>
           </el-table>
-          <el-empty v-else description="还没有数据库变更">
+          <div v-else class="empty-state" style="padding: 34px 20px">
+            <div class="empty-icon"><AppIcon name="database" :size="20" /></div>
+            <h4>还没有数据库变更</h4>
+            <p>从项目数据库导入表和字段，或手动登记一条变更</p>
             <el-button type="primary" :icon="Plus" @click="openAddChange">添加变更</el-button>
-          </el-empty>
+          </div>
         </el-tab-pane>
 
         <el-tab-pane name="svn">
@@ -631,7 +667,7 @@ async function openPath(p) {
             <span class="hint">先在「SVN 提交」标签页关联提交。</span>
           </el-empty>
 
-          <el-card v-if="exportResult" shadow="never" class="result-card">
+          <div v-if="exportResult" class="result-card">
             <el-descriptions :column="1" border size="small">
               <el-descriptions-item label="导出目录">{{ exportResult.folder }}</el-descriptions-item>
               <el-descriptions-item label="压缩包">{{ exportResult.zipPath }}</el-descriptions-item>
@@ -646,10 +682,10 @@ async function openPath(p) {
               <el-button v-if="exportResult.sqlPath" :icon="Document" @click="openPath(exportResult.sqlPath)">打开 SQL</el-button>
               <el-button :icon="Download" @click="openPath(exportResult.zipPath)">定位 ZIP</el-button>
             </div>
-          </el-card>
+          </div>
         </el-tab-pane>
       </el-tabs>
-    </el-card>
+    </div>
 
     <el-dialog
       v-model="changeModalOpen"

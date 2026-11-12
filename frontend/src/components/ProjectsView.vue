@@ -1,7 +1,16 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
-import { Plus, FolderOpened, Refresh, Edit, Delete, Coin } from '@element-plus/icons-vue'
+import AppIcon from './AppIcon.vue'
+import {
+  IconDatabase as Coin,
+  IconEdit as Edit,
+  IconFolder as FolderOpened,
+  IconPlus as Plus,
+  IconRefresh as Refresh,
+  IconSearch as Search,
+  IconTrash as Delete,
+} from './icons'
 import { api } from '../api'
 import { errText } from '../utils'
 import DatabaseConfigDialog from './DatabaseConfigDialog.vue'
@@ -16,7 +25,32 @@ const modalOpen = ref(false)
 const editing = ref(null)
 const saving = ref(false)
 const dbProject = ref(null)
+const filter = ref('all')
+const keyword = ref('')
 const form = reactive({ name: '', path: '' })
+
+const dbCount = computed(() => props.projects.filter((p) => p.dbConfigured).length)
+
+const filteredProjects = computed(() => {
+  let list = props.projects
+  if (filter.value === 'db') list = list.filter((p) => p.dbConfigured)
+  if (filter.value === 'none') list = list.filter((p) => !p.dbConfigured)
+  const k = keyword.value.trim().toLowerCase()
+  if (k) {
+    list = list.filter((p) =>
+      [p.name, p.path, p.repoRoot, p.dbName].some((v) => (v || '').toLowerCase().includes(k))
+    )
+  }
+  return list
+})
+
+function initials(name) {
+  return (name || '?').trim().slice(0, 1)
+}
+
+function dateOnly(value) {
+  return (value || '').slice(0, 10) || '—'
+}
 
 function openCreate() {
   editing.value = null
@@ -81,7 +115,7 @@ async function refreshProject(p) {
 async function remove(p) {
   try {
     await ElMessageBox.confirm(
-      `功能记录会一并删除，但不会修改磁盘上的任何文件。`,
+      '功能记录会一并删除，但不会修改磁盘上的任何文件。',
       `删除项目「${p.name}」？`,
       { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
     )
@@ -115,61 +149,120 @@ function onDBSaved() {
     <div class="view-head">
       <div class="view-title">
         <h2>项目管理</h2>
-        <p>添加需要跟踪的 SVN 工作副本，后续的功能记录和提交都有项目归属。</p>
+        <p>管理 SVN 工作副本，并为每个项目配置数据库连接</p>
       </div>
       <div class="actions">
+        <el-button :icon="Refresh" @click="emit('refresh')">刷新列表</el-button>
         <el-button type="primary" :icon="Plus" @click="openCreate">添加项目</el-button>
       </div>
     </div>
 
-    <el-card v-if="!projects.length" shadow="never" class="panel">
-      <el-empty description="还没有项目">
-        <el-button type="primary" :icon="Plus" @click="openCreate">添加项目</el-button>
-      </el-empty>
-    </el-card>
+    <div class="panel stats-strip">
+      <div class="stat">
+        <div class="value">{{ projects.length }}</div>
+        <div class="label">个项目</div>
+      </div>
+      <div class="stat">
+        <div class="value">{{ dbCount }}<span class="sub"> / {{ projects.length }}</span></div>
+        <div class="label">已连接数据库</div>
+      </div>
+      <div class="stat">
+        <div class="value">{{ projects.length - dbCount }}</div>
+        <div class="label">待配置数据库</div>
+      </div>
+    </div>
 
-    <el-card v-else shadow="never" class="panel table-panel">
-      <el-table :data="projects" style="width: 100%">
-        <el-table-column label="项目" min-width="160">
-          <template #default="{ row }">
-            <div class="cell-title">{{ row.name }}</div>
-            <div class="cell-sub">{{ row.relative || '—' }}</div>
-            <el-tag v-if="row.dbConfigured" size="small" type="info" effect="plain" style="margin-top: 3px; align-self: flex-start">
-              DB: {{ row.dbName }}
-            </el-tag>
+    <div v-if="!projects.length" class="panel empty-state">
+      <div class="empty-icon"><AppIcon name="folder" :size="20" /></div>
+      <h4>还没有项目</h4>
+      <p>添加一个包含 .svn 目录的工作副本，开始记录功能与提交</p>
+      <el-button type="primary" :icon="Plus" @click="openCreate">添加项目</el-button>
+    </div>
+
+    <template v-else>
+      <div class="panel toolbar-panel">
+        <div class="chips">
+          <button class="chip" :class="{ active: filter === 'all' }" @click="filter = 'all'">
+            全部 {{ projects.length }}
+          </button>
+          <button class="chip" :class="{ active: filter === 'db' }" @click="filter = 'db'">
+            已连接数据库 {{ dbCount }}
+          </button>
+          <button class="chip" :class="{ active: filter === 'none' }" @click="filter = 'none'">
+            未配置 {{ projects.length - dbCount }}
+          </button>
+        </div>
+        <div class="toolbar-right">
+          <el-input
+            v-model="keyword"
+            :prefix-icon="Search"
+            placeholder="搜索项目 / 仓库"
+            clearable
+            style="width: 210px"
+          />
+        </div>
+      </div>
+
+      <div class="panel table-panel">
+        <el-table :data="filteredProjects" style="width: 100%">
+          <el-table-column label="项目" min-width="250">
+            <template #default="{ row, $index }">
+              <div class="project-cell">
+                <div class="project-avatar" :class="`tone-${$index % 4}`">{{ initials(row.name) }}</div>
+                <div class="text">
+                  <div class="name">{{ row.name }}</div>
+                  <div class="path">{{ row.path }}</div>
+                </div>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="SVN 仓库" min-width="230" show-overflow-tooltip>
+            <template #default="{ row }">
+              <span class="mono" style="color: var(--pm-text-2)">{{ row.repoRoot || '未读取' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="数据库" width="170">
+            <template #default="{ row }">
+              <span v-if="row.dbConfigured" class="db-tag">已连接 · {{ row.dbName }}</span>
+              <span v-else class="db-tag empty">未配置数据库</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="创建时间" width="120">
+            <template #default="{ row }">
+              <span class="hint">{{ dateOnly(row.createdAt) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="180" align="right">
+            <template #default="{ row }">
+              <div class="row-actions">
+                <button class="icon-button sm" title="数据库连接" @click="dbProject = row">
+                  <el-icon><Coin /></el-icon>
+                </button>
+                <button class="icon-button sm" title="打开目录" @click="openFolder(row)">
+                  <el-icon><FolderOpened /></el-icon>
+                </button>
+                <button class="icon-button sm" title="刷新 SVN 信息" @click="refreshProject(row)">
+                  <el-icon><Refresh /></el-icon>
+                </button>
+                <button class="icon-button sm" title="重命名" @click="openEdit(row)">
+                  <el-icon><Edit /></el-icon>
+                </button>
+                <button class="icon-button sm danger" title="删除" @click="remove(row)">
+                  <el-icon><Delete /></el-icon>
+                </button>
+              </div>
+            </template>
+          </el-table-column>
+          <template #empty>
+            <div class="empty-state" style="padding: 36px 20px">
+              <div class="empty-icon"><AppIcon name="search" :size="20" /></div>
+              <h4>没有匹配的项目</h4>
+              <p>换个关键词或筛选条件试试</p>
+            </div>
           </template>
-        </el-table-column>
-        <el-table-column label="工作副本路径" min-width="280" show-overflow-tooltip>
-          <template #default="{ row }">
-            <span class="mono">{{ row.path }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="SVN 仓库" min-width="220" show-overflow-tooltip>
-          <template #default="{ row }">
-            <span class="mono">{{ row.repoRoot || '未读取' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="200" align="right">
-          <template #default="{ row }">
-            <el-tooltip content="数据库连接" placement="top">
-              <el-button link :icon="Coin" @click="dbProject = row" />
-            </el-tooltip>
-            <el-tooltip content="打开目录" placement="top">
-              <el-button link :icon="FolderOpened" @click="openFolder(row)" />
-            </el-tooltip>
-            <el-tooltip content="刷新 SVN 信息" placement="top">
-              <el-button link :icon="Refresh" @click="refreshProject(row)" />
-            </el-tooltip>
-            <el-tooltip content="重命名" placement="top">
-              <el-button link :icon="Edit" @click="openEdit(row)" />
-            </el-tooltip>
-            <el-tooltip content="删除" placement="top">
-              <el-button link type="danger" :icon="Delete" @click="remove(row)" />
-            </el-tooltip>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
+        </el-table>
+      </div>
+    </template>
 
     <el-dialog
       v-model="modalOpen"

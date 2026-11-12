@@ -1,6 +1,11 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
-import { Link, Refresh, Search } from '@element-plus/icons-vue'
+import AppIcon from './AppIcon.vue'
+import {
+  IconLink as Link,
+  IconRefresh as Refresh,
+  IconSearch as Search,
+} from './icons'
 import { api } from '../api'
 import { actionTagType, errText } from '../utils'
 
@@ -195,11 +200,14 @@ async function link() {
   <div class="view">
     <div class="view-head">
       <div class="view-title">
-        <h2>SVN 提交</h2>
-        <p>读取工作副本的提交记录，勾选提交后关联到功能，变更文件会自动带出。</p>
+        <div class="title-row">
+          <h2>SVN 提交</h2>
+          <span v-if="project" class="count-badge">{{ filtered.length }} 条</span>
+        </div>
+        <p>查看仓库提交记录，按作者筛选，并关联到对应功能</p>
       </div>
       <div class="actions">
-        <el-select v-model="limit" style="width: 130px" @change="onLimitChange">
+        <el-select v-model="limit" style="width: 132px" @change="onLimitChange">
           <el-option v-for="n in limitOptions" :key="n" :value="n" :label="`最近 ${n} 条`" />
         </el-select>
         <el-button type="primary" :icon="Refresh" :loading="loading" :disabled="!project" @click="loadLog">
@@ -208,9 +216,11 @@ async function link() {
       </div>
     </div>
 
-    <el-card v-if="!project" shadow="never" class="panel">
-      <el-empty description="请先选择项目" />
-    </el-card>
+    <div v-if="!project" class="panel empty-state">
+      <div class="empty-icon"><AppIcon name="search" :size="20" /></div>
+      <h4>请先选择项目</h4>
+      <p>在顶部选择工作副本后，这里会读取它的 SVN 提交记录</p>
+    </div>
 
     <template v-else>
       <el-alert
@@ -220,14 +230,6 @@ async function link() {
         show-icon
         title="读取 SVN 提交失败"
         :description="error"
-        style="margin-bottom: 12px"
-      />
-      <el-alert
-        type="info"
-        :closable="false"
-        show-icon
-        title="提交记录来自 svn log，未提交的本地修改不会出现。可按作者过滤，勾选提交后在底部关联到功能。"
-        style="margin-bottom: 12px"
       />
 
       <el-alert
@@ -236,7 +238,6 @@ async function link() {
         :closable="false"
         show-icon
         title="当前项目还没有功能记录，暂时无法关联提交"
-        style="margin-bottom: 12px"
       >
         <div class="empty-assoc">
           <span>功能记录属于当前项目。请先为「{{ project?.name }}」新建功能，或在顶部切换到有功能记录的项目。</span>
@@ -244,41 +245,38 @@ async function link() {
         </div>
       </el-alert>
 
-      <el-card shadow="never" class="panel toolbar-card">
-        <div class="toolbar">
-          <div class="toolbar-left">
-            <el-input
-              v-model="keyword"
-              :prefix-icon="Search"
-              placeholder="按版本号 / 说明 / 文件路径过滤"
-              clearable
-              style="width: 280px"
-            />
-            <el-select
-              v-model="authorFilter"
-              placeholder="全部作者"
-              clearable
-              filterable
-              style="width: 150px"
-              @change="onAuthorChange"
-            >
-              <el-option label="全部作者" value="" />
-              <el-option v-for="a in authors" :key="a" :label="a" :value="a" />
-            </el-select>
-            <el-button v-if="authorFilter && authorFilter !== myAuthor" @click="setAsMine">
-              设为我的账号
-            </el-button>
-          </div>
-          <span class="hint">
-            显示 {{ filtered.length }} / {{ commits.length }} 条
-            <template v-if="myAuthor"> · 我的账号：{{ myAuthor }}</template>
-          </span>
-        </div>
-      </el-card>
+      <div class="panel filter-bar">
+        <el-input
+          v-model="keyword"
+          :prefix-icon="Search"
+          placeholder="搜索版本号或提交说明"
+          clearable
+          style="width: 236px"
+        />
+        <el-select
+          v-model="authorFilter"
+          placeholder="全部作者"
+          clearable
+          filterable
+          style="width: 150px"
+          @change="onAuthorChange"
+        >
+          <el-option label="全部作者" value="" />
+          <el-option v-for="a in authors" :key="a" :label="a" :value="a" />
+        </el-select>
+        <el-button v-if="authorFilter && authorFilter !== myAuthor" @click="setAsMine">
+          设为我的账号
+        </el-button>
+        <span class="spacer"></span>
+        <span class="filter-info">
+          显示 {{ filtered.length }} / {{ commits.length }} 条
+          <template v-if="myAuthor"> · 我的账号：{{ myAuthor }}</template>
+        </span>
+      </div>
 
-      <el-card v-if="loading" v-loading="true" shadow="never" class="panel" style="height: 180px; margin-top: 14px" />
+      <div v-if="loading" v-loading="true" class="panel" style="height: 180px"></div>
 
-      <el-card v-else-if="filtered.length" shadow="never" class="panel table-panel" style="margin-top: 14px">
+      <div v-else-if="filtered.length" class="panel table-panel">
         <el-table
           ref="commitTableRef"
           :data="filtered"
@@ -313,17 +311,23 @@ async function link() {
             <template #default="{ row }">{{ (row.files || []).length }}</template>
           </el-table-column>
         </el-table>
-      </el-card>
+      </div>
 
-      <el-card v-else shadow="never" class="panel" style="margin-top: 14px">
-        <el-empty description="没有提交记录">
-          <span class="hint">换个过滤条件，或点击右上角刷新试试。</span>
-        </el-empty>
-      </el-card>
+      <div v-else class="panel empty-state">
+        <div class="empty-icon"><AppIcon name="search" :size="20" /></div>
+        <h4>没有提交记录</h4>
+        <p>换个过滤条件，或点击右上角刷新提交</p>
+      </div>
 
       <div v-if="features.length" class="selectbar">
-        <span class="count">已选择 <strong>{{ selectedCount }}</strong> 个提交</span>
-        <el-select v-model="targetFeature" placeholder="选择目标功能" style="width: 260px">
+        <div class="select-icon"><AppIcon name="check" :size="15" /></div>
+        <div class="select-info">
+          <span class="count">已选 <strong>{{ selectedCount }}</strong> 条提交</span>
+          <span class="select-sub">将关联到同一个功能</span>
+        </div>
+        <div class="v-divider"></div>
+        <span class="select-label">关联到功能</span>
+        <el-select v-model="targetFeature" placeholder="选择功能" style="width: 240px">
           <el-option
             v-for="f in features"
             :key="f.id"
@@ -331,6 +335,8 @@ async function link() {
             :value="f.id"
           />
         </el-select>
+        <span class="spacer"></span>
+        <span class="hint">关联后到功能详情里即可选择文件导出</span>
         <el-button
           type="primary"
           :icon="Link"
@@ -338,9 +344,8 @@ async function link() {
           :disabled="!selectedCount || !targetFeature"
           @click="link"
         >
-          关联到功能
+          关联提交
         </el-button>
-        <span class="hint">关联后到功能详情里即可选择文件导出</span>
       </div>
     </template>
   </div>

@@ -1,6 +1,6 @@
 <script setup>
 import { onMounted, reactive, ref, watch } from 'vue'
-import { Check, Connection } from '@element-plus/icons-vue'
+import { IconCheck as Check, IconConnection as Connection } from './icons'
 import { api } from '../api'
 import { errText } from '../utils'
 
